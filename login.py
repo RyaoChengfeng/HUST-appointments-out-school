@@ -12,6 +12,7 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from email.mime.multipart import MIMEMultipart
 import smtplib
 from email.mime.text import MIMEText
+from config import Config, log
 
 
 class Email:
@@ -57,7 +58,7 @@ class Email:
             smtp.quit()
             return True
         except Exception as e:
-            print(e)
+            log.info(e)
             return False
 
 
@@ -102,8 +103,8 @@ class AesCbcZeroPadding(object):
 
 
 class OutSchool(object):
-    username = '************'
-    password = '************'
+    username = Config['username']
+    password = Config['password']
     head = {
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
         'Accept-Encoding': 'gzip, deflate',
@@ -121,7 +122,7 @@ class OutSchool(object):
             r.raise_for_status()
             return r
         except req.exceptions as e:
-            print(url, "请求出错", e)
+            log.info(url, "请求出错", e)
             return None
 
     def postUrl(self, url, data, cookie=None):
@@ -131,7 +132,7 @@ class OutSchool(object):
             r.raise_for_status()
             return r
         except req.exceptions as e:
-            print(url, "请求出错", e)
+            log.info(url, "请求出错", e)
             return None
 
     # 需要搞定图像识别，得到验证码
@@ -184,8 +185,8 @@ class OutSchool(object):
         assert response is not None
         html = response.text
         curCookie = response.cookies
-        username = '************'
-        password = '************'
+        username = Config['username']
+        password = Config['password']
 
         lt = re.findall('id="lt" name="lt" value="(.*?)"', html)[0]
         execution = re.findall('name="execution" value="(.*?)"', html)[0]
@@ -194,7 +195,7 @@ class OutSchool(object):
         s = username + password + lt
         rsa = comp.call('strEnc', s, '1', '2', '3')
         code = self.getCode(curCookie)
-        print(code)
+        log.info(code)
         if len(code) != 4:
             return False
         # code = 1234
@@ -245,13 +246,13 @@ class OutSchool(object):
         r = self.session.post(postUrl, json=data, headers=self.head)
         try:
             if r.json()['resCode'] != '0':
-                print('预约失败')
+                log.info('预约失败')
                 return False
             else:
-                print('预约成功')
+                log.info('预约成功')
                 return True
         except Exception as e:
-            print('返回了err网页')
+            log.info('返回了err网页')
             return False
 
 
@@ -264,19 +265,19 @@ def job():
         while True:
             try:
                 if outSchool.login(appCenterUrl):
-                    file.write('登录成功')
+                    file.write('登录成功\n')
                     login_flag = True
                     fail_times = 0
                     break
                 else:
-                    file.write('登录失败')
+                    file.write('登录失败\n')
                     fail_times = fail_times + 1
             except Exception as e:
-                file.write('登录失败，报错，catch到了')
+                file.write('登录失败，报错，catch到了\n')
                 fail_times = fail_times + 1
 
             if fail_times >= 10:
-                file.write('登录系统出现问题，需要赶紧处理')
+                file.write('登录系统出现问题，需要赶紧处理\n')
                 break
             else:
                 continue
@@ -284,30 +285,32 @@ def job():
         while login_flag:
             try:
                 if outSchool.dateOutSchool():
-                    file.write('预约成功')
+                    file.write('预约成功\n')
                     fail_times = 0
                 else:
-                    file.write('预约失败')
+                    file.write('预约失败\n')
                     fail_times = fail_times + 1
             except Exception as e:
-                file.write('预约失败，报错，catch到了')
+                file.write('预约失败，报错，catch到了\n')
                 fail_times = fail_times + 1
 
             if fail_times >= 10:
-                file.write('预约系统出现问题，需要赶紧处理')
+                file.write('预约系统出现问题，需要赶紧处理\n')
                 break
             else:
                 continue
     # asdasda
-    email = Email()
     with open('log.txt', 'r') as file:
         s = file.read()
 
     sub = datetime.now().strftime('%Y-%m-%d') + '预约出校'
-    email.send_email(subject=sub, text=s)
+    if Config['email']:
+        email = Email()
+        email.send_email(subject=sub, text=s)
 
 
 def main():
+    job() # 初始启动一次
     scheduler = BlockingScheduler(timezone='Asia/Shanghai')
     scheduler.add_job(job, 'cron', hour=8)
     scheduler.start()

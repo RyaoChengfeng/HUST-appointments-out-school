@@ -1,0 +1,15 @@
+version: "3"
+
+services:
+  hust-out-school:
+    image: hust-out-school
+    volumes:
+      - ./config.yml:/app/config.yml
+      - ./log.txt:/app/log.txt
+    container_name: hust_out_school
+    networks:
+      - hust_out_school
+    restart: always
+
+networks:
+  hust_out_school:
